@@ -1,28 +1,71 @@
 const express = require("express");
+const axios = require("axios");
+const RSSParser = require("rss-parser");
+const NodeCache = require("node-cache");
 const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = 5000; // porta personalizada
+const cache = new NodeCache({ stdTTL: 300 }); // cache de 5 minutos
+const parser = new RSSParser();
+
+const helmet = require("helmet");
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        fontSrc: ["'self'", "https:", "data:"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      },
+    },
+  })
+);
+
 
 app.use(cors());
 
-app.get("/news", (req, res) => {
-  res.json([
-    {
-      id: 1,
-      title: "React 19 lançado",
-      content: "Nova versão traz melhorias de performance e Server Components.",
-      img:"https://images.unsplash.com/photo-1742684562317-b1e55040d909?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-    },
-    {
-      id: 2,
-      title: "Node.js 22 estável",
-      content: "Nova versão do Node adiciona suporte a módulos mais eficientes.",
-      img:"https://images.unsplash.com/photo-1749794680236-86626308ebb7?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-    },
-  ]);
+// --- Função para buscar dados de API externa ---
+async function fetchFromGNews() {
+  const apiKey = "SUA_API_KEY_AQUI";
+  const url = `https://gnews.io/api/v4/top-headlines?lang=pt&apikey=${apiKey}`;
+  const response = await axios.get(url);
+  return response.data.articles;
+}
+
+// --- Função para buscar RSS ---
+async function fetchFromRSS(url) {
+  const feed = await parser.parseURL(url);
+  return feed.items.map(item => ({
+    title: item.title,
+    content: item.contentSnippet,
+    link: item.link,
+  }));
+}
+
+// --- Endpoint principal ---
+app.get("/news", async (req, res) => {
+  const category = req.query.category || "general";
+
+  // Verifica se tem cache
+  const cached = cache.get(category);
+  if (cached) {
+    return res.json(cached);
+  }
+
+  try {
+    const rssNews = await fetchFromRSS("https://rss.uol.com.br/feed/noticias.xml");
+    const gnewsNews = await fetchFromGNews();
+
+    const allNews = [...rssNews, ...gnewsNews].slice(0, 10); // limitar resultados
+    cache.set(category, allNews); // salvar no cache
+    res.json(allNews);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao buscar notícias" });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Fake API rodando em http://localhost:${PORT}`);
+  console.log(`API de notícias rodando em http://localhost:${PORT}`);
 });

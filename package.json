@@ -1,7 +1,7 @@
 {
   "name": "teste-api",
   "version": "1.0.0",
-  "start":"node index.js",
+  "start": "node index.js",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -13,8 +13,11 @@
   "license": "ISC",
   "packageManager": "pnpm@10.7.1",
   "dependencies": {
+    "axios": "^1.9.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "node-cache": "^5.1.2",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
