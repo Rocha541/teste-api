@@ -29,7 +29,7 @@ app.use(cors());
 // --- Função para buscar dados de API externa ---
 async function fetchFromGNews() {
   const apiKey = "SUA_API_KEY_AQUI";
-  const url = `https://gnews.io/api/v4/top-headlines?lang=pt&apikey=${apiKey}`;
+  const url = `https://gnews.io/api/v4/top-headlines?lang=pt&apikey=6030882339532b64dbf5851d6af73ec0`;
   const response = await axios.get(url);
   return response.data.articles;
 }
