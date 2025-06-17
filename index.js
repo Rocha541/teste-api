@@ -3,13 +3,12 @@ const axios = require("axios");
 const RSSParser = require("rss-parser");
 const NodeCache = require("node-cache");
 const cors = require("cors");
+const helmet = require("helmet");
 
 const app = express();
-const PORT = 5000; // porta personalizada
-const cache = new NodeCache({ stdTTL: 300 }); // cache de 5 minutos
+const PORT = 5000; // porta customizável
+const cache = new NodeCache({ stdTTL: 300 }); // 5 minutos
 const parser = new RSSParser();
-
-const helmet = require("helmet");
 
 app.use(
   helmet({
@@ -23,18 +22,21 @@ app.use(
   })
 );
 
-
 app.use(cors());
 
-// --- Função para buscar dados de API externa ---
-async function fetchFromGNews() {
-  const apiKey = "SUA_API_KEY_AQUI";
-  const url = `https://gnews.io/api/v4/top-headlines?lang=pt&apikey=6030882339532b64dbf5851d6af73ec0`;
+// --- API externa (GNews) ---
+async function fetchFromGNews(category = "general") {
+  const apiKey = "SUA_API_KEY_AQUI"; // substitua pela sua chave da GNews
+  const url = `https://gnews.io/api/v4/top-headlines?lang=pt&topic=${category}&apikey=6030882339532b64dbf5851d6af73ec0`;
   const response = await axios.get(url);
-  return response.data.articles;
+  return response.data.articles.map(article => ({
+    title: article.title,
+    content: article.description,
+    link: article.url,
+  }));
 }
 
-// --- Função para buscar RSS ---
+// --- RSS ---
 async function fetchFromRSS(url) {
   const feed = await parser.parseURL(url);
   return feed.items.map(item => ({
@@ -44,28 +46,26 @@ async function fetchFromRSS(url) {
   }));
 }
 
-// --- Endpoint principal ---
+// --- Rota principal ---
 app.get("/news", async (req, res) => {
   const category = req.query.category || "general";
 
-  // Verifica se tem cache
   const cached = cache.get(category);
-  if (cached) {
-    return res.json(cached);
-  }
+  if (cached) return res.json(cached);
 
   try {
-    const rssNews = await fetchFromRSS("https://rss.uol.com.br/feed/noticias.xml");
-    const gnewsNews = await fetchFromGNews();
+    const rssNews = await fetchFromRSS("https://g1.globo.com/rss/g1/");
+    const gnewsNews = await fetchFromGNews(category);
 
-    const allNews = [...rssNews, ...gnewsNews].slice(0, 10); // limitar resultados
-    cache.set(category, allNews); // salvar no cache
+    const allNews = [...rssNews, ...gnewsNews].slice(0, 20);
+    cache.set(category, allNews);
     res.json(allNews);
   } catch (err) {
+    console.error("❌ Erro ao buscar notícias:", err.message);
     res.status(500).json({ error: "Erro ao buscar notícias" });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`API de notícias rodando em http://localhost:${PORT}`);
+  console.log(`✅ API rodando em http://localhost:${PORT}/news`);
 });
